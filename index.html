@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>RRF - Multi-User Aerospace Financial Intelligence</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent: #3b82f6; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: #070b14; 
+            color: #f8fafc; 
+            overflow-x: hidden;
+            /* Optimasi Safe Area */
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+            padding-right: env(safe-area-inset-right);
+        }
+        .logo-font { font-family: 'Orbitron', sans-serif; }
+        .bg-space {
+            background: radial-gradient(circle at top right, #1e293b, #070b14);
+            min-height: 100vh;
+        }
+        .glass-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+        .hidden { display: none; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        .eye-toggle { position: absolute; right: 1.25rem; top: 50%; transform: translateY(-50%); cursor: pointer; color: #64748b; }
+        .eye-toggle:hover { color: #3b82f6; }
+        
+        #report-template { color: #1e293b; background: #ffffff; padding: 40px; font-family: 'Arial', sans-serif; width: 750px; margin: 0 auto; }
+        .pdf-header { border-bottom: 3px solid #3b82f6; padding-bottom: 15px; margin-bottom: 25px; }
+        .pdf-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10px; table-layout: fixed; }
+        .pdf-table th { background-color: #f1f5f9; border: 1px solid #cbd5e1; padding: 10px; text-align: left; color: #475569; }
+        .pdf-table td { border: 1px solid #cbd5e1; padding: 8px; word-wrap: break-word; vertical-align: top; }
+        .pdf-summary-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 10px; margin-bottom: 25px; display: flex; justify-content: space-around; }
+        .summary-item { text-align: center; flex: 1; border-right: 1px solid #e2e8f0; }
+        .summary-item:last-child { border-right: none; }
+        .summary-label { font-size: 8px; font-weight: bold; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 4px; }
+        .summary-value { font-size: 12px; font-weight: bold; color: #0f172a; }
+        
+        .profile-nav-img { width: 45px; height: 45px; object-fit: cover; border-radius: 50%; border: 2px solid #3b82f6; cursor: pointer; }
+        .modal-overlay { background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(4px); }
+        .card-ghost-toggle { cursor: pointer; transition: color 0.2s; }
+        .card-ghost-toggle:hover { color: #3b82f6; }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 640px) {
+            .glass-card { border-radius: 1.5rem; }
+            h2 { font-size: 1.25rem; }
+            .pdf-summary-box { flex-direction: column; gap: 10px; }
+            .summary-item { border-right: none; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+            .summary-item:last-child { border-bottom: none; }
+        }
+    </style>
+</head>
+<body class="bg-space">
+
+    <div id="auth-page" class="min-h-screen flex items-center justify-center p-4">
+        <div class="glass-card p-8 md:p-10 rounded-[2rem] shadow-2xl w-full max-w-md text-center border-t border-white/10">
+            <div class="mb-8">
+                <div class="inline-block p-6 rounded-3xl bg-blue-500/10 mb-4 border border-blue-500/20 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
+                    <i class="fas fa-user-shield text-5xl text-blue-400"></i>
+                </div>
+                <h1 class="logo-font text-3xl md:text-4xl font-bold text-white tracking-tighter uppercase">RRF CORE</h1>
+                <p id="auth-subtitle" class="text-blue-400 text-[10px] font-bold uppercase tracking-[0.4em] mt-3">Security Gateway v6.3</p>
+            </div>
+
+            <form id="login-form" class="space-y-4">
+                <input type="text" id="login-user" class="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500" placeholder="Username" required>
+                <div class="relative">
+                    <input type="password" id="login-pass" class="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500" placeholder="Password" required>
+                    <i class="fas fa-eye eye-toggle" id="toggleLoginPass" onclick="toggleVisibility('login-pass', 'toggleLoginPass')"></i>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-2xl transition-all uppercase tracking-widest text-xs">Login</button>
+                <div class="flex justify-between text-[10px] px-2">
+                    <button type="button" onclick="showAuth('signup')" class="text-slate-400 hover:text-blue-400 uppercase font-bold">Buat Akun</button>
+                    <button type="button" onclick="showAuth('forgot')" class="text-slate-500 hover:text-red-400 uppercase font-bold">Lupa Password?</button>
+                </div>
+            </form>
+
+            <form id="signup-form" class="hidden space-y-4">
+                <input type="text" id="reg-user" class="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500" placeholder="Username Baru" required>
+                <div class="relative">
+                    <input type="password" id="reg-pass" class="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500" placeholder="Buat Password" required>
+                    <i class="fas fa-eye eye-toggle" id="toggleRegPass" onclick="toggleVisibility('reg-pass', 'toggleRegPass')"></i>
+                </div>
+                <input type="text" id="reg-secret" class="w-full bg-slate-900/80 border border-blue-900/40 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500" placeholder="Kata Rahasia" required>
+                <button type="submit" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-2xl transition-all uppercase tracking-widest text-xs">Daftar</button>
+                <button type="button" onclick="showAuth('login')" class="text-[10px] text-slate-400 hover:text-white uppercase font-bold">Kembali</button>
+            </form>
+
+            <form id="forgot-form" class="hidden space-y-4 text-left">
+                <input type="text" id="forgot-user" class="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500" placeholder="Username" required>
+                <input type="text" id="forgot-secret" class="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500" placeholder="Kata Rahasia" required>
+                <div class="relative">
+                    <input type="password" id="forgot-new-pass" class="w-full bg-slate-900/80 border border-blue-500/30 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500" placeholder="Password Baru" required>
+                    <i class="fas fa-eye eye-toggle" id="toggleForgotPass" onclick="toggleVisibility('forgot-new-pass', 'toggleForgotPass')"></i>
+                </div>
+                <button type="submit" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-4 rounded-2xl transition-all uppercase tracking-widest text-xs">Reset</button>
+                <button type="button" onclick="showAuth('login')" class="w-full text-center text-[10px] text-slate-400 hover:text-white uppercase font-bold">Kembali</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="dashboard" class="hidden min-h-screen pb-20">
+        <nav class="glass-card border-b border-white/5 sticky top-0 z-50 px-4 md:px-6 py-4">
+            <div class="max-w-[1500px] mx-auto flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <img id="nav-profile-preview" src="https://i.stack.imgur.com/l60Hf.png" class="profile-nav-img" onclick="toggleAccountModal()">
+                    <div class="flex flex-col">
+                        <div class="flex items-center gap-2">
+                            <span class="logo-font text-lg md:text-xl font-bold text-blue-500">RRF</span>
+                            <span id="welcome-user" class="hidden sm:inline text-xs font-bold text-white uppercase tracking-wider">Guest</span>
+                        </div>
+                        <span id="real-time-clock" class="text-[9px] md:text-[10px] text-slate-400 font-medium font-mono">Loading...</span>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="generatePDF()" class="p-3 md:px-4 md:py-2 bg-purple-600 text-white rounded-xl font-bold uppercase text-[10px] shadow-lg">
+                        <i class="fas fa-file-pdf"></i> <span class="hidden md:inline ml-1">Laporan</span>
+                    </button>
+                    <button onclick="logout()" class="p-3 md:px-4 md:py-2 bg-red-600/10 text-red-500 border border-red-500/20 rounded-xl font-bold uppercase text-[10px]">
+                        <i class="fas fa-sign-out-alt"></i> <span class="hidden md:inline ml-1">Keluar</span>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-[1500px] mx-auto p-4 md:p-6 lg:p-10">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10">
+                <div class="glass-card p-6 rounded-3xl border-l-4 border-indigo-500">
+                    <p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Rasio Tabungan</p>
+                    <h2 id="savings-ratio" class="text-3xl font-bold text-indigo-400">0%</h2>
+                </div>
+                <div class="glass-card p-6 rounded-3xl border-l-4 border-yellow-500">
+                    <p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Kesehatan Keuangan</p>
+                    <div class="flex items-center gap-3">
+                        <h2 id="health-score" class="text-2xl font-bold text-yellow-400 italic">Analisis...</h2>
+                        <div id="health-indicator" class="w-3 h-3 rounded-full bg-slate-600"></div>
+                    </div>
+                </div>
+                <div class="glass-card p-6 rounded-3xl border-l-4 border-pink-500">
+                    <p class="text-slate-400 text-[10px] font-bold uppercase mb-1">Status Aliran</p>
+                    <h2 id="burn-forecast" class="text-2xl font-bold text-pink-400 italic">Stabil</h2>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-10">
+                <div class="glass-card p-6 rounded-3xl border-b-4 border-cyan-500">
+                    <div class="flex justify-between items-center mb-2">
+                        <p class="text-slate-400 text-[10px] font-bold uppercase">Saldo Awal</p>
+                        <i onclick="toggleIncognito()" class="fas fa-eye-slash card-ghost-toggle text-slate-500 text-xs incognito-eye"></i>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-cyan-500 font-bold text-xl">Rp</span>
+                            <input type="text" id="input-initial-balance" oninput="changeInitialBalance()" class="bg-transparent text-2xl font-bold text-white w-full outline-none focus:text-cyan-400" placeholder="0">
+                        </div>
+                        <span class="text-[8px] text-slate-500 italic font-bold">Masukan nominal disini...</span>
+                    </div>
+                </div>
+
+                <div class="glass-card p-6 rounded-3xl border-b-4 border-blue-600">
+                    <div class="flex justify-between items-center mb-2">
+                        <p class="text-slate-400 text-[10px] font-bold uppercase">Sisa Likuiditas</p>
+                        <i onclick="toggleIncognito()" class="fas fa-eye-slash card-ghost-toggle text-slate-500 text-xs incognito-eye"></i>
+                    </div>
+                    <h2 id="total-balance" class="text-2xl font-bold italic">Rp 0</h2>
+                </div>
+
+                <div class="glass-card p-6 rounded-3xl border-b-4 border-green-500">
+                    <p class="text-slate-400 text-[10px] font-bold uppercase mb-2">Pemasukan</p>
+                    <h2 id="total-income" class="text-2xl font-bold text-green-400">Rp 0</h2>
+                </div>
+                <div class="glass-card p-6 rounded-3xl border-b-4 border-red-500">
+                    <p class="text-slate-400 text-[10px] font-bold uppercase mb-2">Pengeluaran</p>
+                    <h2 id="total-expense" class="text-2xl font-bold text-red-400">Rp 0</h2>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
+                <div class="lg:col-span-4 space-y-6 md:space-y-8">
+                    <div class="glass-card p-6 md:p-8 rounded-[2rem]">
+                        <h3 class="text-lg font-bold mb-6 uppercase tracking-widest text-blue-400 italic">Transaksi</h3>
+                        <div class="space-y-4">
+                            <input type="text" id="desc" placeholder="Keterangan..." class="w-full bg-slate-900/50 p-4 rounded-2xl border border-slate-700 outline-none focus:border-blue-500 text-sm">
+                            <input type="number" id="amount" placeholder="Nominal (Rp)..." class="w-full bg-slate-900/50 p-4 rounded-2xl border border-slate-700 outline-none focus:border-blue-500 text-sm">
+                            <select id="category" onchange="checkCategory()" class="w-full bg-slate-900/50 p-4 rounded-2xl border border-slate-700 outline-none text-sm">
+                                <option value="Sparepart">Sparepart</option>
+                                <option value="Makanan">Makanan</option>
+                                <option value="Skripsi">Skripsi</option>
+                                <option value="Lainnya">Lainnya...</option>
+                            </select>
+                            <input type="text" id="custom-category" placeholder="Kategori Baru..." class="hidden w-full bg-blue-900/20 p-4 rounded-2xl border border-blue-500 outline-none italic text-sm">
+                            <select id="type" class="w-full bg-slate-900/50 p-4 rounded-2xl border border-slate-700 outline-none font-bold text-sm">
+                                <option value="expense" class="text-red-400">PENGELUARAN (-)</option>
+                                <option value="income" class="text-green-400">PEMASUKAN (+)</option>
+                            </select>
+                            <button onclick="addTransaction()" class="w-full bg-blue-600 py-4 rounded-2xl font-bold shadow-xl hover:bg-blue-500 transition-all active:scale-95 text-xs">LOG DATA</button>
+                        </div>
+                    </div>
+                    <div class="glass-card p-6 rounded-[2rem]">
+                        <p class="text-xs font-bold text-slate-500 mb-4 uppercase">Perbandingan Bulanan</p>
+                        <canvas id="barChart" height="250"></canvas>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-8 space-y-6 md:space-y-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                        <div class="glass-card p-6 rounded-[2rem]"><canvas id="lineChart" height="200"></canvas></div>
+                        <div class="glass-card p-6 rounded-[2rem]"><canvas id="doughnutChart" height="200"></canvas></div>
+                    </div>
+                    <div class="glass-card rounded-[2rem] overflow-hidden">
+                        <div class="p-6 border-b border-white/5 flex flex-col sm:flex-row justify-between items-center bg-white/5 gap-4">
+                            <div class="flex items-center gap-4">
+                                <h3 class="font-bold uppercase tracking-widest text-sm">Riwayat</h3>
+                                <button onclick="clearHistoryOnly()" class="bg-red-500/10 hover:bg-red-600 text-red-500 hover:text-white px-3 py-1 rounded-lg text-[10px] font-bold border border-red-500/20 uppercase transition-all">Hapus Riwayat</button>
+                            </div>
+                            <input type="text" id="search-log" oninput="updateUI()" placeholder="Cari..." class="bg-slate-900 border border-slate-700 rounded-full px-6 py-2 text-xs outline-none focus:border-blue-500 w-full sm:w-48">
+                        </div>
+                        <div class="overflow-x-auto max-h-[500px]">
+                            <table class="w-full text-left text-xs">
+                                <thead class="text-[10px] uppercase text-slate-500 border-b border-white/5 font-bold">
+                                    <tr><th class="p-5">Deskripsi</th><th class="p-5">Kategori</th><th class="p-5 text-right">Magnitude</th><th class="p-5 text-center">Aksi</th></tr>
+                                </thead>
+                                <tbody id="transaction-list"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="account-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4 modal-overlay">
+        <div class="glass-card w-full max-w-md p-8 rounded-[2.5rem] border border-blue-500/30 overflow-y-auto max-h-[90vh] relative">
+            <button onclick="toggleAccountModal()" class="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors z-10"><i class="fas fa-times"></i></button>
+            <div id="account-view-main" class="space-y-6">
+                <div class="text-center">
+                    <h2 class="logo-font text-xl font-bold text-blue-400 mb-6 uppercase">KENDALI AKUN</h2>
+                    <div class="relative inline-block mb-3">
+                        <img id="modal-profile-preview" src="https://i.stack.imgur.com/l60Hf.png" class="w-24 h-24 rounded-full border-4 border-blue-600 object-cover">
+                        <label for="upload-photo" class="absolute bottom-0 right-0 bg-blue-600 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-500"><i class="fas fa-camera text-xs"></i></label>
+                        <input type="file" id="upload-photo" class="hidden" accept="image/*" onchange="updateProfilePhoto()">
+                    </div>
+                    <h3 id="modal-username" class="text-xl font-bold text-white uppercase tracking-tighter italic">USERNAME</h3>
+                </div>
+                <div class="space-y-3">
+                    <button onclick="switchAccountView('password')" class="w-full text-left p-4 bg-slate-800/50 hover:bg-blue-900/30 rounded-2xl flex items-center justify-between border border-white/5 transition-all group"><span><i class="fas fa-key mr-3 text-blue-400"></i> Ganti Password</span><i class="fas fa-chevron-right text-[10px] text-slate-600"></i></button>
+                    <button onclick="switchAccountView('secret')" class="w-full text-left p-4 bg-slate-800/50 hover:bg-blue-900/30 rounded-2xl flex items-center justify-between border border-white/5 transition-all group"><span><i class="fas fa-user-secret mr-3 text-blue-400"></i> Ganti Kata Rahasia</span><i class="fas fa-chevron-right text-[10px] text-slate-600"></i></button>
+                    <div class="pt-4"><button onclick="deleteAccount()" class="w-full text-left p-4 bg-red-900/10 hover:bg-red-900/30 rounded-2xl flex items-center justify-between border border-red-500/10 text-red-400 transition-all font-bold"><span><i class="fas fa-user-slash mr-3"></i> Hapus Akun</span></button></div>
+                </div>
+            </div>
+            <div id="account-view-password" class="hidden space-y-6">
+                <div class="flex items-center gap-3 mb-6"><button onclick="switchAccountView('main')" class="text-blue-400 hover:text-white"><i class="fas fa-arrow-left"></i></button><h2 class="logo-font text-lg font-bold text-blue-400">PASSWORD</h2></div>
+                <div class="space-y-4">
+                    <div class="relative"><input type="password" id="new-password-input" class="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500" placeholder="Password Baru"><i class="fas fa-eye eye-toggle" id="toggleNewPass" onclick="toggleVisibility('new-password-input', 'toggleNewPass')"></i></div>
+                    <button onclick="updatePasswordUI()" class="w-full bg-blue-600 py-4 rounded-2xl font-bold shadow-lg uppercase tracking-widest text-xs">Update</button>
+                </div>
+            </div>
+            <div id="account-view-secret" class="hidden space-y-6">
+                <div class="flex items-center gap-3 mb-6"><button onclick="switchAccountView('main')" class="text-blue-400 hover:text-white"><i class="fas fa-arrow-left"></i></button><h2 class="logo-font text-lg font-bold text-blue-400">SECRET KEY</h2></div>
+                <div class="space-y-4">
+                    <input type="text" id="new-secret-input" class="w-full bg-slate-900/80 border border-slate-700 rounded-2xl px-5 py-4 text-white outline-none focus:border-blue-500" placeholder="Kata Rahasia Baru">
+                    <button onclick="updateSecretUI()" class="w-full bg-blue-600 py-4 rounded-2xl font-bold shadow-lg uppercase tracking-widest text-xs">Update</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="report-template" class="hidden">
+        <div class="pdf-header">
+            <h1 style="margin: 0; color: #3b82f6; font-size: 20px;">FINANCIAL INTELLIGENCE STATEMENT</h1>
+            <p style="margin: 5px 0; color: #64748b; font-size: 9px; font-weight: bold;">ID: <span id="pdf-id"></span> | Waktu Cetak: <span id="pdf-date"></span></p>
+        </div>
+        <div style="margin-bottom: 20px;">
+            <p style="margin: 0; font-size: 10px; color: #64748b;">Diterbitkan Untuk:</p>
+            <p style="margin: 2px 0; font-size: 14px; font-weight: bold; color: #0f172a;"><span id="pdf-user"></span></p>
+        </div>
+        <div class="pdf-summary-box">
+            <div class="summary-item"><span class="summary-label">Saldo Awal</span><span id="pdf-initial" class="summary-value">Rp 0</span></div>
+            <div class="summary-item"><span class="summary-label">Pemasukan</span><span id="pdf-income" class="summary-value" style="color: #10b981;">Rp 0</span></div>
+            <div class="summary-item"><span class="summary-label">Pengeluaran</span><span id="pdf-expense" class="summary-value" style="color: #ef4444;">Rp 0</span></div>
+            <div class="summary-item"><span class="summary-label">Sisa Saldo</span><span id="pdf-total" class="summary-value">Rp 0</span></div>
+        </div>
+        <table class="pdf-table">
+            <thead><tr><th style="width:25%">Waktu</th><th style="width:35%">Keterangan</th><th style="width:20%">Kategori</th><th style="width:20%;text-align:right">Magnitude</th></tr></thead>
+            <tbody id="pdf-table-body"></tbody>
+        </table>
+        <div style="margin-top: 40px; text-align: right;"><p style="font-size: 9px; margin-bottom: 30px;">Tanda Tangan Operator</p><strong id="pdf-sign-name" style="font-size: 11px; text-transform: uppercase;">OPERATOR</strong></div>
+    </div>
+
+    <script>
+        let users = JSON.parse(localStorage.getItem('rrf_users')) || [];
+        let loggedUser = sessionStorage.getItem('rrf_logged_user') || null;
+        let isIncognito = false;
+
+        function updateClock() {
+            const clockEl = document.getElementById('real-time-clock');
+            if (clockEl) {
+                const now = new Date();
+                const options = { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+                clockEl.innerText = now.toLocaleDateString('id-ID', options).toUpperCase();
+            }
+        }
+        setInterval(updateClock, 1000);
+
+        function toggleVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (input.type === "password") { input.type = "text"; icon.classList.replace('fa-eye', 'fa-eye-slash'); }
+            else { input.type = "password"; icon.classList.replace('fa-eye-slash', 'fa-eye'); }
+        }
+
+        function toggleIncognito() {
+            isIncognito = !isIncognito;
+            document.querySelectorAll('.incognito-eye').forEach(eye => {
+                if (isIncognito) { eye.classList.replace('fa-eye-slash', 'fa-eye'); eye.style.color = "#3b82f6"; }
+                else { eye.classList.replace('fa-eye', 'fa-eye-slash'); eye.style.color = "#64748b"; }
+            });
+            updateUI();
+        }
+
+        function maskValue(val) { return isIncognito ? '******' : val; }
+
+        function showAuth(type) {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('signup-form').classList.add('hidden');
+            document.getElementById('forgot-form').classList.add('hidden');
+            if(type === 'login') document.getElementById('login-form').classList.remove('hidden');
+            else if(type === 'signup') document.getElementById('signup-form').classList.remove('hidden');
+            else if(type === 'forgot') document.getElementById('forgot-form').classList.remove('hidden');
+        }
+
+        document.getElementById('signup-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const u = document.getElementById('reg-user').value.trim(), p = document.getElementById('reg-pass').value, s = document.getElementById('reg-secret').value.trim();
+            if(users.find(user => user.username === u)) return alert("User exist!");
+            users.push({ username: u, password: p, secret: s });
+            localStorage.setItem('rrf_users', JSON.stringify(users));
+            alert("Success!"); showAuth('login');
+        });
+
+        document.getElementById('login-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const u = document.getElementById('login-user').value.trim(), p = document.getElementById('login-pass').value;
+            const user = users.find(user => user.username === u && user.password === p);
+            if(user) { sessionStorage.setItem('rrf_logged_user', u); initDashboard(u); } else alert("Denied.");
+        });
+
+        document.getElementById('forgot-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const u = document.getElementById('forgot-user').value.trim(), s = document.getElementById('forgot-secret').value.trim(), np = document.getElementById('forgot-new-pass').value;
+            const idx = users.findIndex(user => user.username === u && user.secret === s);
+            if(idx !== -1) { users[idx].password = np; localStorage.setItem('rrf_users', JSON.stringify(users)); alert("Reset Success!"); showAuth('login'); }
+            else alert("Error.");
+        });
+
+        let transactions = [];
+        let initialBalance = 0;
+        let lineChart, doughnutChart, barChart;
+
+        function initDashboard(username) {
+            loggedUser = username;
+            document.getElementById('auth-page').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            document.getElementById('welcome-user').innerText = username;
+            document.getElementById('modal-username').innerText = username;
+            transactions = JSON.parse(localStorage.getItem(`rrf_data_${username}`)) || [];
+            initialBalance = parseFloat(localStorage.getItem(`rrf_bal_${username}`)) || 0;
+            const savedPhoto = localStorage.getItem(`rrf_photo_${username}`);
+            if(savedPhoto) { document.getElementById('nav-profile-preview').src = savedPhoto; document.getElementById('modal-profile-preview').src = savedPhoto; }
+            else { 
+                document.getElementById('nav-profile-preview').src = "https://i.stack.imgur.com/l60Hf.png";
+                document.getElementById('modal-profile-preview').src = "https://i.stack.imgur.com/l60Hf.png";
+            }
+            document.getElementById('input-initial-balance').value = initialBalance;
+            initCharts();
+            updateUI();
+            updateClock();
+        }
+
+        if(loggedUser) initDashboard(loggedUser);
+
+        function toggleAccountModal() { document.getElementById('account-modal').classList.toggle('hidden'); switchAccountView('main'); }
+        function switchAccountView(view) {
+            document.getElementById('account-view-main').classList.add('hidden');
+            document.getElementById('account-view-password').classList.add('hidden');
+            document.getElementById('account-view-secret').classList.add('hidden');
+            document.getElementById(`account-view-${view}`).classList.remove('hidden');
+        }
+        function updatePasswordUI() {
+            const newP = document.getElementById('new-password-input').value; if(!newP) return;
+            users[users.findIndex(u => u.username === loggedUser)].password = newP;
+            localStorage.setItem('rrf_users', JSON.stringify(users)); alert("Updated!"); switchAccountView('main');
+        }
+        function updateSecretUI() {
+            const newS = document.getElementById('new-secret-input').value; if(!newS) return;
+            users[users.findIndex(u => u.username === loggedUser)].secret = newS;
+            localStorage.setItem('rrf_users', JSON.stringify(users)); alert("Updated!"); switchAccountView('main');
+        }
+        function updateProfilePhoto() {
+            const file = document.getElementById('upload-photo').files[0], reader = new FileReader();
+            reader.onloadend = () => { const b64 = reader.result; document.getElementById('nav-profile-preview').src = b64; document.getElementById('modal-profile-preview').src = b64; localStorage.setItem(`rrf_photo_${loggedUser}`, b64); }
+            if(file) reader.readAsDataURL(file);
+        }
+        function deleteAccount() { if(confirm("Hapus?")) { users.splice(users.findIndex(u => u.username === loggedUser), 1); localStorage.removeItem(`rrf_data_${loggedUser}`); localStorage.removeItem(`rrf_bal_${loggedUser}`); localStorage.removeItem(`rrf_photo_${loggedUser}`); localStorage.setItem('rrf_users', JSON.stringify(users)); logout(); } }
+
+        function initCharts() {
+            const ctxL = document.getElementById('lineChart').getContext('2d');
+            if(lineChart) lineChart.destroy();
+            lineChart = new Chart(ctxL, { type: 'line', data: { labels: [], datasets: [{ label: 'Saldo', data: [], borderColor: '#3b82f6', tension: 0.4, fill: true, backgroundColor: 'rgba(59, 130, 246, 0.05)' }] }, options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { ticks: { color: '#475569' } } } } });
+            const ctxD = document.getElementById('doughnutChart').getContext('2d');
+            if(doughnutChart) doughnutChart.destroy();
+            doughnutChart = new Chart(ctxD, { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'], borderWidth: 0 }] }, options: { responsive: true, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 } } } } } });
+            const ctxB = document.getElementById('barChart').getContext('2d');
+            if(barChart) barChart.destroy();
+            barChart = new Chart(ctxB, { type: 'bar', data: { labels: ['Lalu', 'Kini'], datasets: [{ label: 'Masuk', data: [0, 0], backgroundColor: '#10b981' }, { label: 'Keluar', data: [0, 0], backgroundColor: '#ef4444' }] }, options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 10 } } } }, scales: { y: { ticks: { color: '#475569' } }, x: { ticks: { color: '#475569' } } } } });
+        }
+
+        function updateUI() {
+            if(!loggedUser) return;
+            const list = document.getElementById('transaction-list'), search = document.getElementById('search-log').value.toLowerCase();
+            let inc = 0, exp = 0, cats = {}; list.innerHTML = '';
+            const now = new Date(), currM = now.getMonth(), lastM = currM === 0 ? 11 : currM - 1;
+            let mData = { current: { in: 0, out: 0 }, last: { in: 0, out: 0 } };
+            const filtered = transactions.filter(t => t.desc.toLowerCase().includes(search) || t.category.toLowerCase().includes(search));
+            
+            transactions.forEach(t => {
+                const tDate = new Date(t.timestamp || Date.now()), tM = tDate.getMonth();
+                if(t.type === 'income') { inc += t.amount; if(tM === currM) mData.current.in += t.amount; if(tM === lastM) mData.last.in += t.amount; }
+                else { exp += t.amount; cats[t.category] = (cats[t.category] || 0) + t.amount; if(tM === currM) mData.current.out += t.amount; if(tM === lastM) mData.last.out += t.amount; }
+            });
+
+            filtered.slice().reverse().forEach((t) => {
+                const idx = transactions.indexOf(t);
+                const row = document.createElement('tr');
+                row.className = "border-b border-white/5 hover:bg-white/[0.02]";
+                row.innerHTML = `<td class="p-5"><span class="text-slate-500 block mb-1 text-[9px] uppercase">${t.date}</span><span class="font-bold text-white uppercase">${t.desc}</span></td><td class="p-5"><span class="px-2 py-1 bg-slate-800 rounded text-[9px] uppercase font-bold">${t.category}</span></td><td class="p-5 text-right font-bold ${t.type === 'income' ? 'text-green-400' : 'text-red-400'}">${t.type === 'income' ? '+' : '-'} ${t.amount.toLocaleString('id-ID')}</td><td class="p-5 text-center"><button onclick="deleteTx(${idx})" class="text-slate-600 hover:text-red-400"><i class="fas fa-trash"></i></button></td>`;
+                list.appendChild(row);
+            });
+
+            const currentTotal = initialBalance + inc - exp;
+            const inputBal = document.getElementById('input-initial-balance');
+            if (isIncognito) { inputBal.type = "text"; inputBal.value = "******"; } 
+            else { inputBal.type = "number"; inputBal.value = initialBalance; }
+
+            document.getElementById('total-balance').innerText = `Rp ${maskValue(currentTotal.toLocaleString('id-ID'))}`;
+            document.getElementById('total-income').innerText = `Rp ${inc.toLocaleString('id-ID')}`;
+            document.getElementById('total-expense').innerText = `Rp ${exp.toLocaleString('id-ID')}`;
+            const ratio = inc > 0 ? (((inc - exp) / inc) * 100).toFixed(1) : 0;
+            document.getElementById('savings-ratio').innerText = `${ratio}%`;
+            const healthEl = document.getElementById('health-score'), indEl = document.getElementById('health-indicator');
+            if(currentTotal <= 0) { healthEl.innerText = "Kritis"; indEl.className = "w-3 h-3 rounded-full bg-red-500 animate-pulse"; }
+            else if(ratio < 10) { healthEl.innerText = "Waspada"; indEl.className = "w-3 h-3 rounded-full bg-yellow-500"; }
+            else { healthEl.innerText = "Sehat"; indEl.className = "w-3 h-3 rounded-full bg-green-500"; }
+            document.getElementById('burn-forecast').innerText = (exp > inc && inc > 0) ? "Menurun" : "Stabil";
+            
+            localStorage.setItem(`rrf_data_${loggedUser}`, JSON.stringify(transactions));
+            localStorage.setItem(`rrf_bal_${loggedUser}`, initialBalance);
+            
+            let running = initialBalance;
+            lineChart.data.labels = transactions.map(t => t.date);
+            lineChart.data.datasets[0].data = transactions.map(t => { running += (t.type === 'income' ? t.amount : -t.amount); return running; });
+            lineChart.update();
+            doughnutChart.data.labels = Object.keys(cats);
+            doughnutChart.data.datasets[0].data = Object.values(cats);
+            doughnutChart.update();
+            barChart.data.datasets[0].data = [mData.last.in, mData.current.in];
+            barChart.data.datasets[1].data = [mData.last.out, mData.current.out];
+            barChart.update();
+        }
+
+        function changeInitialBalance() { const val = document.getElementById('input-initial-balance').value; if(val !== "******") { initialBalance = parseFloat(val) || 0; updateUI(); } }
+        function addTransaction() {
+            const d = document.getElementById('desc').value, a = parseFloat(document.getElementById('amount').value), type = document.getElementById('type').value;
+            let c = document.getElementById('category').value; if (c === 'Lainnya') c = document.getElementById('custom-category').value || 'Umum';
+            if(!d || !a) return alert("Fill data!");
+            const now = new Date(), dateStr = now.toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+            transactions.push({ desc: d, amount: a, category: c, type, date: dateStr, timestamp: now.getTime() });
+            document.getElementById('desc').value = ''; document.getElementById('amount').value = ''; updateUI();
+        }
+        function deleteTx(i) { if(confirm("Hapus?")) { transactions.splice(i, 1); updateUI(); } }
+        function clearHistoryOnly() { if(confirm("Clear?")) { transactions = []; updateUI(); } }
+        function checkCategory() { document.getElementById('custom-category').classList.toggle('hidden', document.getElementById('category').value !== 'Lainnya'); }
+        function logout() { sessionStorage.removeItem('rrf_logged_user'); location.reload(); }
+        function generatePDF() {
+            const template = document.getElementById('report-template'), pdfTable = document.getElementById('pdf-table-body');
+            let repInc = 0, repExp = 0; transactions.forEach(t => { if(t.type === 'income') repInc += t.amount; else repExp += t.amount; });
+            document.getElementById('pdf-id').innerText = 'STMT-' + Date.now().toString(36).toUpperCase();
+            document.getElementById('pdf-date').innerText = new Date().toLocaleString('id-ID');
+            document.getElementById('pdf-user').innerText = loggedUser.toUpperCase();
+            document.getElementById('pdf-sign-name').innerText = loggedUser;
+            document.getElementById('pdf-initial').innerText = 'Rp ' + initialBalance.toLocaleString('id-ID');
+            document.getElementById('pdf-income').innerText = 'Rp ' + repInc.toLocaleString('id-ID');
+            document.getElementById('pdf-expense').innerText = 'Rp ' + repExp.toLocaleString('id-ID');
+            document.getElementById('pdf-total').innerText = 'Rp ' + (initialBalance + repInc - repExp).toLocaleString('id-ID');
+            pdfTable.innerHTML = '';
+            transactions.forEach((t, idx) => { pdfTable.innerHTML += `<tr style="${idx % 2 === 0 ? '' : 'background-color: #f9fafb;'}"><td>${t.date}</td><td><strong>${t.desc}</strong></td><td>${t.category}</td><td style="text-align:right; font-weight:bold; color:${t.type==='income'?'#10b981':'#ef4444'}">${t.type==='income'?'+':'-'} ${t.amount.toLocaleString('id-ID')}</td></tr>`; });
+            template.classList.remove('hidden');
+            html2pdf().from(template).set({ margin: 10, filename: `RRF_Statement_${loggedUser}.pdf`, html2canvas: { scale: 3 }, jsPDF: { format: 'a4' }, pagebreak: { mode: 'avoid-all' } }).save().then(() => template.classList.add('hidden'));
+        }
+    </script>
+</body>
+</html>
